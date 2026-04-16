@@ -433,20 +433,28 @@ async function ss(k, data){
 }
 
 // 🔽 CARGA INICIAL DESDE SHEETS
-async function initData(){
-  try{
-    const res = await fetch(API + "?action=getAll");
-    const data = await res.json();
+function initData(){
+  return new Promise((resolve, reject) => {
 
-    // 🔴 FILTRAR ADMIN
-    CACHE.users = data.users.filter(u => u.role !== "admin");
-    CACHE.grads = data.grads;
+    const callbackName = "cb_" + Date.now();
 
-  }catch(e){
-    console.error("Error cargando Sheets", e);
-    alert("No se pudo conectar con Google Sheets");
-  }
-}  
+    window[callbackName] = function(data){
+      try{
+        CACHE.users = data.users.filter(u => u.role !== "admin");
+        CACHE.grads = data.grads;
+        resolve();
+      }catch(e){
+        reject(e);
+      }
+    };
+
+    const script = document.createElement("script");
+    script.src = API + "?action=getAll&callback=" + callbackName;
+    script.onerror = reject;
+
+    document.body.appendChild(script);
+  });
+}
 function ls(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):[]}catch{return[]}}
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
 function getSession(){try{return JSON.parse(localStorage.getItem(K_SESSION)||'null')}catch{return null}}
