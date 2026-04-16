@@ -429,18 +429,29 @@ function getGrads(){return state.grads}
 function findGrad(uid){return getGrads().find(g=>g.uid===uid)||{}}
 
 async function apiRequest(action,payload={},method='POST'){
-  const opts={method,headers:{Accept:'application/json'}};
+  const opts={method,headers:{Accept:'application/json, text/plain, */*'}};
   let url=APPS_SCRIPT_URL;
   if(method==='GET'){
     const params=new URLSearchParams({action,...payload});
     url+='?'+params.toString();
   }else{
-    opts.headers['Content-Type']='application/json';
-    opts.body=JSON.stringify({action,...payload});
+    const body=new URLSearchParams();
+    body.set('action',action);
+    Object.entries(payload).forEach(([k,v])=>{
+      if(v!==undefined&&v!==null)body.set(k,String(v));
+    });
+    opts.headers['Content-Type']='application/x-www-form-urlencoded;charset=UTF-8';
+    opts.body=body.toString();
   }
   const res=await fetch(url,opts);
   if(!res.ok)throw new Error('No se pudo conectar con la base compartida');
-  const data=await res.json();
+  const text=await res.text();
+  let data;
+  try{
+    data=JSON.parse(text);
+  }catch{
+    throw new Error('La respuesta del Apps Script no es JSON válido');
+  }
   if(data&&data.ok===false)throw new Error(data.message||'La operación no pudo completarse');
   return data;
 }
