@@ -432,22 +432,13 @@ function getUsers(){return state.users}
 function getGrads(){return state.grads}
 function findGrad(uid){return getGrads().find(g=>g.uid===uid)||{}}
 
-async function apiRequest(action,payload={},method='POST'){
-  const opts={method,headers:{Accept:'application/json, text/plain, */*'}};
-  let url=APPS_SCRIPT_URL;
-  if(method==='GET'){
-    const params=new URLSearchParams({action,...payload});
-    url+='?'+params.toString();
-  }else{
-    const body=new URLSearchParams();
-    body.set('action',action);
-    Object.entries(payload).forEach(([k,v])=>{
-      if(v!==undefined&&v!==null)body.set(k,String(v));
-    });
-    opts.headers['Content-Type']='application/x-www-form-urlencoded;charset=UTF-8';
-    opts.body=body.toString();
-  }
-  const res=await fetch(url,opts);
+async function apiRequest(action,payload={}){
+  const params=new URLSearchParams({action});
+  Object.entries(payload).forEach(([k,v])=>{
+    if(v!==undefined&&v!==null&&v!=='')params.set(k,String(v));
+  });
+  const url=APPS_SCRIPT_URL+'?'+params.toString();
+  const res=await fetch(url,{method:'GET',headers:{Accept:'application/json, text/plain, */*'}});
   if(!res.ok)throw new Error('No se pudo conectar con la base compartida');
   const text=await res.text();
   let data;
@@ -462,7 +453,7 @@ async function apiRequest(action,payload={},method='POST'){
 
 async function loadRemoteData(){
   try{
-    const data=await apiRequest('list',{},'GET');
+    const data=await apiRequest('list');
     setStateFromPayload(data);
     return data;
   }catch(err){
