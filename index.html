@@ -390,12 +390,33 @@ tr:hover td{background:#fafaf8}
 <script>
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 const K_USERS='rm_users2',K_GRADS='rm_grads2',K_SESSION='rm_sess2';
-function ls(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):[]}catch{return[]}}
-function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
-function getSession(){try{return JSON.parse(localStorage.getItem(K_SESSION)||'null')}catch{return null}}
-function setSession(u){localStorage.setItem(K_SESSION,JSON.stringify(u))}
-function clearSession(){localStorage.removeItem(K_SESSION)}
-
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybYBJKNs2dqcaSndA3Z3h5vuk2fF0RKSHTIlTqEsAbp-b8QgJAO70DujHDfZ1GmaSagA/exec';
+//function ls(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):[]}catch{return[]}}
+//function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+//function getSession(){try{return JSON.parse(localStorage.getItem(K_SESSION)||'null')}catch{return null}}
+//function setSession(u){localStorage.setItem(K_SESSION,JSON.stringify(u))}
+//function clearSession(){localStorage.removeItem(K_SESSION)}
+async function cargarDatosDesdeSheet() {
+    try {
+        // Mostramos un indicador de carga si lo deseas
+        console.log("Conectando con la base de datos central...");
+        
+        const response = await fetch(SCRIPT_URL);
+        const data = await response.json();
+        
+        // Guardamos los datos en la variable global que usa el resto de tu código
+        window.grads = data; 
+        
+        // Una vez que tenemos los datos, disparamos los renders
+        renderPublic();      // Tu función para las estadísticas
+        renderLeafletMap();  // Tu función para el mapa
+        renderGradsTable(); // Tu función para la tabla
+        
+    } catch (error) {
+        console.error("Error al obtener datos:", error);
+        alert("No se pudo conectar con la base de datos de egresados.");
+    }
+}
 // Province coordinates (real lat/lng centers)
 const PROV_COORDS={
   'Buenos Aires':[-36.6,-60.0],'Catamarca':[-28.5,-65.8],'Chaco':[-26.9,-60.0],
