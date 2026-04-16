@@ -399,7 +399,9 @@ function clearSession(){localStorage.removeItem(K_SESSION)}
 function sanitizeUser(u){
   if(!u)return null;
   const role=(u.role||'user').toLowerCase();
-  return {id:String(u.id||u.uid||u.email||Date.now()),name:u.name||'',email:u.email||'',year:u.year?parseInt(u.year):null,role};
+  const fullName=(u.name||[u.nombre,u.apellido].filter(Boolean).join(' ')).trim();
+  const yearVal=u.year||u.anio_egreso;
+  return {id:String(u.id||u.uid||u.email||Date.now()),name:fullName,email:u.email||'',year:yearVal?parseInt(yearVal):null,role};
 }
 function normalizeUser(raw){
   const user=sanitizeUser(raw);
@@ -411,10 +413,12 @@ function normalizeGrad(raw){
     publicEmail:raw.publicEmail||raw.public_email||raw.emailPublico||'',
     company:raw.company||raw.empresa||'',
     sector:raw.sector||'',
-    role:raw.role||raw.cargo||'',
+    role:raw.jobRole||raw.role||raw.cargo||'',
     province:raw.province||raw.provincia||'',
     city:raw.city||raw.ciudad||'',
-    country:raw.country||raw.pais||'Argentina'
+    country:raw.country||raw.pais||'Argentina',
+    lat:raw.lat||'',
+    lng:raw.lng||''
   };
 }
 function setStateFromPayload(payload){
@@ -577,8 +581,11 @@ async function doRegister(){
   show('e-pass',pass.length<6);if(pass.length<6)ok=false;
   show('e-pass2',pass!==pass2);if(pass!==pass2)ok=false;
   if(!ok)return;
+  const parts=name.split(/\s+/).filter(Boolean);
+  const nombre=parts.shift()||'';
+  const apellido=parts.join(' ');
   try{
-    const data=await apiRequest('register',{name,email,pass,year:parseInt(year)||null});
+    const data=await apiRequest('register',{nombre,apellido,email,pass,anio_egreso:parseInt(year)||null});
     await loadRemoteData();
     const sessionUser=sanitizeUser(data.user)||getUsers().find(u=>u.email===email)||{id:email,name,email,year:parseInt(year)||null,role:'user'};
     setSession(sessionUser);
@@ -627,12 +634,12 @@ async function saveProfile(){
   const sess=getSession();if(!sess)return;
   const rec={uid:sess.id,
     publicEmail:document.getElementById('p-email').value.trim(),
-    company:document.getElementById('p-company').value.trim(),
+    empresa:document.getElementById('p-company').value.trim(),
     sector:document.getElementById('p-sector').value,
-    role:document.getElementById('p-role').value.trim(),
-    province:document.getElementById('p-province').value,
-    city:document.getElementById('p-city').value.trim(),
-    country:document.getElementById('p-country').value.trim()||'Argentina'
+    cargo:document.getElementById('p-role').value.trim(),
+    provincia:document.getElementById('p-province').value,
+    ciudad:document.getElementById('p-city').value.trim(),
+    pais:document.getElementById('p-country').value.trim()||'Argentina'
   };
   try{
     await apiRequest('updateProfile',rec);
