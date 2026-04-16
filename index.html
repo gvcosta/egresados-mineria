@@ -404,21 +404,26 @@ function sanitizeUser(u){
   return {id:String(u.id||u.uid||u.email||Date.now()),name:fullName,email:u.email||'',year:yearVal?parseInt(yearVal):null,role};
 }
 function normalizeUser(raw){
-  const user=sanitizeUser(raw);
-  return user&&user.role!=='admin'?user:null;
+  return {
+    id: raw.email,
+    name: raw.nombre + " " + raw.apellido,
+    email: raw.email,
+    year: raw.anio_egreso ? parseInt(raw.anio_egreso) : null,
+    role: (raw.Perfil || 'User').toLowerCase()
+  };
 }
 function normalizeGrad(raw){
   return {
-    uid:String(raw.uid||raw.id||raw.userId||raw.email||''),
-    publicEmail:raw.publicEmail||raw.public_email||raw.emailPublico||'',
-    company:raw.company||raw.empresa||'',
-    sector:raw.sector||'',
-    role:raw.jobRole||raw.role||raw.cargo||'',
-    province:raw.province||raw.provincia||'',
-    city:raw.city||raw.ciudad||'',
-    country:raw.country||raw.pais||'Argentina',
-    lat:raw.lat||'',
-    lng:raw.lng||''
+    uid: raw.email,
+    publicEmail: raw.email,
+    company: raw.empresa,
+    sector: raw.carrera,
+    role: raw.cargo,
+    province: raw.provincia,
+    city: raw.ciudad,
+    country: raw.pais || 'Argentina',
+    lat: raw.lat,
+    lng: raw.lng
   };
 }
 function setStateFromPayload(payload){
@@ -593,7 +598,7 @@ async function doLogin(){
   try{
     const data=await apiRequest('login',{email,pass});
     const user=sanitizeUser(data.user);
-    if(!user||user.role==='admin')throw new Error('Ese usuario no está habilitado para esta vista');
+    if(!user)throw new Error('Ese usuario no está habilitado para esta vista');
     closeModal('login');
     setSession(user);
     await loadRemoteData();
