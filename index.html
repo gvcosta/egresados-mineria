@@ -236,13 +236,15 @@ tr:hover td{background:#fafaf8}
         </div>
         <div class="field"><label>Ciudad</label><input id="p-ciudad" type="text" placeholder="Ej: San Juan"/></div>
       </div>
-      <p class="sec-label" style="margin-top:6px">Coordenadas (para el mapa)</p>
-      <div class="field-grid">
-        <div class="field"><label>Latitud</label><input id="p-lat" type="number" step="any" placeholder="-31.5"/></div>
-        <div class="field"><label>Longitud</label><input id="p-lng" type="number" step="any" placeholder="-68.5"/></div>
+      <!-- Geocode preview -->
+      <div id="geocode-status" style="display:none;margin-bottom:12px;padding:9px 14px;border-radius:8px;font-size:13px"></div>
+      <div id="profile-map-wrap" style="display:none;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)">
+        <div id="profile-map" style="width:100%;height:200px"></div>
       </div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Podés encontrar las coordenadas buscando tu ciudad en <a href="https://www.latlong.net" target="_blank" style="color:var(--teal)">latlong.net</a></p>
-      <button class="btn btn-primary" onclick="saveProfile()">Guardar cambios</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveProfile()">Guardar cambios</button>
+        <button class="btn btn-ghost btn-sm" onclick="previewGeocode()" id="btn-preview-geo">📍 Ver ubicación en mapa</button>
+      </div>
     </div>
 
     <div id="tab-stats" class="tab-content">
@@ -378,10 +380,7 @@ tr:hover td{background:#fafaf8}
       <div class="field"><label>Provincia</label><input id="eu-provincia" type="text"/></div>
       <div class="field"><label>Ciudad</label><input id="eu-ciudad" type="text"/></div>
     </div>
-    <div class="field-grid">
-      <div class="field"><label>Latitud</label><input id="eu-lat" type="number" step="any"/></div>
-      <div class="field"><label>Longitud</label><input id="eu-lng" type="number" step="any"/></div>
-    </div>
+    <p style="font-size:12px;color:var(--muted);margin:4px 0 12px">Las coordenadas se calcularán automáticamente al guardar.</p>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-primary" id="btn-save-edit" onclick="saveEditUser()">Guardar</button>
       <button class="btn btn-ghost" onclick="closeModal('edit-user')">Cancelar</button>
@@ -547,35 +546,122 @@ function loadDashboard() {
   document.getElementById("p-pais").value      = currentUser.pais || "Argentina";
   document.getElementById("p-provincia").value = currentUser.provincia || "";
   document.getElementById("p-ciudad").value    = currentUser.ciudad || "";
-  document.getElementById("p-lat").value       = currentUser.lat || "";
-  document.getElementById("p-lng").value       = currentUser.lng || "";
+  // lat/lng se gestionan automáticamente por geocodificación
+  if (currentUser.lat && currentUser.lng) {
+    showProfileMap(parseFloat(currentUser.lat), parseFloat(currentUser.lng),
+      [currentUser.ciudad, currentUser.provincia].filter(Boolean).join(", "));
+  }
+}
+
+// ─── GEOCODING (Nominatim / OpenStreetMap, sin API key) ───────────────────────
+let profileMapInstance = null;
+
+async function geocode(ciudad, provincia, pais) {
+  const query = [ciudad, provincia, pais].filter(Boolean).join(", ");
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+  const res = await fetch(url, { headers: { "Accept-Language": "es" } });
+  const data = await res.json();
+  if (data && data.length > 0) {
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+  }
+  return null;
+}
+
+function showProfileMap(lat, lng, label) {
+  const wrap = document.getElementById("profile-map-wrap");
+  wrap.style.display = "block";
+  if (profileMapInstance) { profileMapInstance.remove(); profileMapInstance = null; }
+  profileMapInstance = L.map("profile-map").setView([lat, lng], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(profileMapInstance);
+  const icon = L.divIcon({
+    html: `<div style="width:16px;height:16px;background:#1B2A4A;border:3px solid #D4962A;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,
+    className: "", iconAnchor: [8,8], iconSize: [16,16]
+  });
+  L.marker([lat, lng], { icon }).addTo(profileMapInstance)
+    .bindPopup(`<div style="font-family:sans-serif;font-size:12px"><b>${label}</b></div>`).openPopup();
+  setTimeout(() => profileMapInstance.invalidateSize(), 100);
+}
+
+function setGeoStatus(msg, type) {
+  const el = document.getElementById("geocode-status");
+  el.style.display = "block";
+  el.textContent = msg;
+  el.style.background = type === "ok"  ? "rgba(29,158,117,.1)" :
+                        type === "err" ? "rgba(226,75,74,.1)"  : "rgba(27,42,74,.06)";
+  el.style.color       = type === "ok"  ? "#0f6e56" :
+                         type === "err" ? "#993c1d"  : "var(--muted)";
+  el.style.border      = type === "ok"  ? "1px solid rgba(29,158,117,.3)" :
+                         type === "err" ? "1px solid rgba(226,75,74,.3)"  : "1px solid var(--border)";
+}
+
+async function previewGeocode() {
+  const ciudad    = document.getElementById("p-ciudad").value.trim();
+  const provincia = document.getElementById("p-provincia").value.trim();
+  const pais      = document.getElementById("p-pais").value.trim() || "Argentina";
+  if (!ciudad && !provincia) { setGeoStatus("Ingresá al menos una ciudad o provincia para ver la ubicación.", "err"); return; }
+  const btn = document.getElementById("btn-preview-geo");
+  btn.disabled = true; btn.textContent = "Buscando...";
+  setGeoStatus("Buscando ubicación...", "info");
+  const coords = await geocode(ciudad, provincia, pais);
+  if (coords) {
+    setGeoStatus(`✓ Ubicación encontrada: ${[ciudad, provincia, pais].filter(Boolean).join(", ")}`, "ok");
+    showProfileMap(coords.lat, coords.lng, [ciudad, provincia].filter(Boolean).join(", "));
+  } else {
+    setGeoStatus("No se encontró la ubicación. Verificá ciudad y país.", "err");
+    document.getElementById("profile-map-wrap").style.display = "none";
+  }
+  btn.disabled = false; btn.textContent = "📍 Ver ubicación en mapa";
 }
 
 async function saveProfile() {
   if (!currentUser) return;
+  const ciudad    = document.getElementById("p-ciudad").value.trim();
+  const provincia = document.getElementById("p-provincia").value;
+  const pais      = document.getElementById("p-pais").value.trim() || "Argentina";
   const btn = document.querySelector("#tab-profile .btn-primary");
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando...';
+
+  let lat = "", lng = "";
+  // Geocodificar automáticamente si hay ciudad o provincia
+  if (ciudad || provincia) {
+    setGeoStatus("Detectando coordenadas automáticamente...", "info");
+    try {
+      const coords = await geocode(ciudad, provincia, pais);
+      if (coords) {
+        lat = coords.lat; lng = coords.lng;
+        showProfileMap(lat, lng, [ciudad, provincia].filter(Boolean).join(", "));
+        setGeoStatus(`✓ Coordenadas detectadas para ${[ciudad, provincia, pais].filter(Boolean).join(", ")}`, "ok");
+      } else {
+        setGeoStatus("No se pudo detectar la ubicación exacta, el resto del perfil se guarda igual.", "err");
+      }
+    } catch(e) {
+      setGeoStatus("Error al detectar coordenadas. El perfil se guarda sin ubicación en el mapa.", "err");
+    }
+  }
+
   try {
     const res = await api("saveProfile", {
       email:     currentUser.email,
       cargo:     document.getElementById("p-cargo").value.trim(),
       empresa:   document.getElementById("p-empresa").value.trim(),
-      pais:      document.getElementById("p-pais").value.trim(),
-      provincia: document.getElementById("p-provincia").value,
-      ciudad:    document.getElementById("p-ciudad").value.trim(),
-      lat:       document.getElementById("p-lat").value,
-      lng:       document.getElementById("p-lng").value,
+      pais,
+      provincia,
+      ciudad,
+      lat,
+      lng,
     });
     if (res.ok) {
-      // Update local user object
       currentUser.cargo     = document.getElementById("p-cargo").value.trim();
       currentUser.empresa   = document.getElementById("p-empresa").value.trim();
-      currentUser.provincia = document.getElementById("p-provincia").value;
-      currentUser.ciudad    = document.getElementById("p-ciudad").value.trim();
-      currentUser.lat       = document.getElementById("p-lat").value;
-      currentUser.lng       = document.getElementById("p-lng").value;
-      statsCache = null; // invalidar caché
-      showAlert("prof-ok", "¡Perfil guardado correctamente!");
+      currentUser.provincia = provincia;
+      currentUser.ciudad    = ciudad;
+      currentUser.pais      = pais;
+      currentUser.lat       = String(lat);
+      currentUser.lng       = String(lng);
+      statsCache = null;
+      showAlert("prof-ok", "¡Perfil guardado! La ubicación aparecerá en el mapa.");
     } else {
       showAlert("prof-err", res.error || "Error al guardar");
     }
@@ -698,15 +784,25 @@ function openEditUser(email) {
   document.getElementById("eu-cargo").value    = u.cargo || "";
   document.getElementById("eu-provincia").value= u.provincia || "";
   document.getElementById("eu-ciudad").value   = u.ciudad || "";
-  document.getElementById("eu-lat").value      = u.lat || "";
-  document.getElementById("eu-lng").value      = u.lng || "";
   openModal("edit-user");
 }
 
 async function saveEditUser() {
   const targetEmail = document.getElementById("edit-target-email").value;
+  const ciudad    = document.getElementById("eu-ciudad").value.trim();
+  const provincia = document.getElementById("eu-provincia").value.trim();
   const btn = document.getElementById("btn-save-edit");
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando...';
+
+  // Auto-geocode
+  let lat = "", lng = "";
+  if (ciudad || provincia) {
+    try {
+      const coords = await geocode(ciudad, provincia, "Argentina");
+      if (coords) { lat = coords.lat; lng = coords.lng; }
+    } catch(e) {}
+  }
+
   try {
     const res = await api("adminUpdate", {
       adminEmail: currentUser.email,
@@ -718,10 +814,10 @@ async function saveEditUser() {
         anio_egreso: document.getElementById("eu-anio").value,
         empresa:     document.getElementById("eu-empresa").value.trim(),
         cargo:       document.getElementById("eu-cargo").value.trim(),
-        provincia:   document.getElementById("eu-provincia").value.trim(),
-        ciudad:      document.getElementById("eu-ciudad").value.trim(),
-        lat:         document.getElementById("eu-lat").value,
-        lng:         document.getElementById("eu-lng").value,
+        provincia,
+        ciudad,
+        lat,
+        lng,
       }
     });
     if (res.ok) {
