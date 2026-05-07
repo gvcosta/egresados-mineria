@@ -884,9 +884,8 @@ function renderDirectory(tbodyId, data) {
     <td><span class="badge badge-teal">${d.cargo||"—"}</span></td>
     <td>${[d.ciudad,d.provincia].filter(Boolean).join(", ")||"—"}</td>
     <td>${d.email ? `<a href="mailto:${d.email}" style="color:var(--teal);font-size:12px;text-decoration:none">${d.email}</a>` : `<span style="color:var(--muted);font-size:12px">—</span>`}</td>
-    //<td>${d.anio_egreso ? `<span class="badge badge-gold">${d.anio_egreso}</span>` : "—"}</td>
-    <td>${d.carrera ? `<span class="badge badge-gold">${d.carrera}</span>` : "—"}</td>
-  </tr>`).join("");
+    <td>${d.anio_egreso ? `<span class="badge badge-gold">${d.anio_egreso}</span>` : "—"}</td>
+      </tr>`).join("");
 }
 
 function filterDir() {
