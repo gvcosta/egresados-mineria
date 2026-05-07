@@ -191,7 +191,7 @@ tr:hover td{background:#fafaf8}
         <input class="search-input" id="dir-search" type="text" placeholder="Buscar por nombre, empresa o ubicación..." oninput="filterDir()"/>
       </div>
       <div style="overflow-x:auto">
-        <table><thead><tr><th>Nombre</th><th>Empresa</th><th>Cargo</th><th>Ubicación</th><th>Contacto</th><th>Egresó</th></tr></thead>
+        <table><thead><tr><th>Nombre</th><th>Carrera</th><th>Empresa</th><th>Cargo</th><th>Ubicación</th><th>Contacto</th><th>Egresó</th></tr></thead>
         <tbody id="pub-dir-body"></tbody></table>
       </div>
     </div>
@@ -266,7 +266,7 @@ tr:hover td{background:#fafaf8}
           <input class="search-input" id="dash-search" type="text" placeholder="Buscar por nombre, empresa o ubicación..." oninput="filterDashDir()"/>
         </div>
         <div style="overflow-x:auto">
-          <table><thead><tr><th>Nombre</th><th>Empresa</th><th>Cargo</th><th>Ubicación</th><th>Contacto</th><th>Egresó</th></tr></thead>
+          <table><thead><tr><th>Nombre</th><th>Carrera</th><th>Empresa</th><th>Cargo</th><th>Ubicación</th><th>Contacto</th><th>Egresó</th></tr></thead>
           <tbody id="dash-dir-body"></tbody></table>
         </div>
       </div>
@@ -396,7 +396,7 @@ tr:hover td{background:#fafaf8}
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const API_URL = "https://script.google.com/macros/s/AKfycbyeAvlf9RAH2dLu1tqGyi7fCRObEUK8YMPCVnclXx3STBYaLIo45870xQqWFTOwEXwhAQ/exec"
+const API_URL = "https://script.google.com/macros/s/AKfycbykKzAQBOY156w4UytTp0KQLKUT8ib4ygjfMlWItGJdlgTpJggZO8zkmMM8MbFmjnO8Dw/exec"
   
                 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -552,6 +552,11 @@ function renderPublicFromCache() {
   renderBarChart("pub-chart-prov",  s.provinces || {}, "navy");
   renderBarChart("pub-chart-sector",s.sectors   || {}, "teal");
   renderLeafletMap("pub-map", "pub-map-count", s.markers || []);
+  // DEBUG: inspeccionar campos disponibles en el directorio
+  if ((s.directory||[]).length > 0) {
+    console.log("🔍 Campos del primer registro del directorio:", Object.keys(s.directory[0]));
+    console.log("🔍 Datos completos del primer registro:", s.directory[0]);
+  }
   renderDirectory("pub-dir-body", s.directory || []);
   const dc = document.getElementById("dir-count");
   if (dc) dc.textContent = (s.directory||[]).length + " registros";
@@ -875,11 +880,12 @@ async function deleteUser(email) {
 function renderDirectory(tbodyId, data) {
   const tbody = document.getElementById(tbodyId); if (!tbody) return;
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin datos registrados aún</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Sin datos registrados aún</td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(d => `<tr>
     <td><strong>${d.nombre||"—"}</strong></td>
+    <td><span class="badge badge-navy">${d.carrera||"—"}</span></td>
     <td>${d.empresa||"—"}</td>
     <td><span class="badge badge-teal">${d.cargo||"—"}</span></td>
     <td>${[d.ciudad,d.provincia].filter(Boolean).join(", ")||"—"}</td>
@@ -893,6 +899,7 @@ function filterDir() {
   const data = statsCache ? statsCache.directory || [] : [];
   const filtered = q ? data.filter(d =>
     (d.nombre||"").toLowerCase().includes(q) ||
+    (d.carrera||"").toLowerCase().includes(q) ||
     (d.empresa||"").toLowerCase().includes(q) ||
     (d.ciudad||"").toLowerCase().includes(q) ||
     (d.provincia||"").toLowerCase().includes(q)
@@ -905,6 +912,7 @@ function filterDashDir() {
   const data = statsCache ? statsCache.directory || [] : [];
   const filtered = q ? data.filter(d =>
     (d.nombre||"").toLowerCase().includes(q) ||
+    (d.carrera||"").toLowerCase().includes(q) ||
     (d.empresa||"").toLowerCase().includes(q) ||
     (d.ciudad||"").toLowerCase().includes(q) ||
     (d.provincia||"").toLowerCase().includes(q)
